@@ -1,24 +1,37 @@
+import { windowOpen } from "./windowOpen.";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Xumm } from "xumm";
+import {
+  CreatedPayload,
+  XummJsonTransaction,
+  XummPayload,
+  XummPostPayloadBodyBlob,
+  XummPostPayloadBodyJson,
+} from "xumm-sdk/dist/src/types";
 
 type PromiseType<T> = T extends Promise<infer P> ? P : never;
 type RemovePromisified<T> = { [P in keyof T]: PromiseType<T[P]> };
 
 type User = RemovePromisified<Xumm["user"]>;
-type _Enviroment = RemovePromisified<
+type Environment = RemovePromisified<
   Omit<Xumm["environment"], "retrieving" | "ready" | "success" | "retrieved">
->;
-type Environment = _Enviroment & {
-  retrieving: Promise<void>;
-  ready: Promise<void>;
-  success: Promise<void>;
-  retrieved: Promise<void>;
-};
+  >;
+type SignTransactionCreatePayload =  XummPostPayloadBodyJson
+      | XummPostPayloadBodyBlob
+  | XummJsonTransaction
+type SignTransactionOption = { onPayloadCreated?: (payload: CreatedPayload) => void }
 
-type ReturnType = Omit<Xumm, "user" | "environment"> & {
-  loading: boolean;
+type ReturnType = {
+  status: "loading" | "connected" | "unconnected";
+  connect: () => Promise<void>;
+  disconnect: () => Promise<void>;
+  signTransaction: (
+    payload: SignTransactionCreatePayload,
+    option?: SignTransactionOption
+  ) => Promise<XummPayload | null | undefined>;
   user?: User;
-  environment: Environment;
+  environment?: Environment;
+  xumm: Xumm;
 };
 
 export const useXumm = (
@@ -32,8 +45,12 @@ export const useXumm = (
     return xumm;
   }, [apiKeyOrJwt, apiSecretOrOtt]);
   const [user, setUser] = useState<User | undefined>(undefined);
-  const [environment, setEnvironment] = useState<_Enviroment | undefined>(
+  const [environment, setEnvironment] = useState<Environment | undefined>(
     undefined
+  );
+  const status = useMemo(
+    () => (loading ? "loading" : user ? "connected" : "unconnected"),
+    [loading, user]
   );
 
   const getUser = useCallback(async () => {
@@ -70,25 +87,59 @@ export const useXumm = (
     xumm.on("retrieved", fetch);
   }, [getEnvironment, getUser, xumm]);
 
-  const logout = useCallback(async () => {
-    await xumm.logout();
-    setUser(undefined)
-    setEnvironment(undefined)
-  }, []);
+  const connect = useCallback(async () => {
+    await xumm.authorize();
+  }, [xumm]);
+
+  const disconnect = useCallback(async () => {
+    if (xumm.runtime.xapp) {
+      await xumm.xapp?.close();
+    } else {
+      await xumm.logout();
+      setUser(undefined);
+      setEnvironment(undefined);
+    }
+  }, [xumm]);
+
+  const signTransaction = async (
+    payload: SignTransactionCreatePayload,
+    option?: SignTransactionOption
+  ) => {
+    let pcWindowId: Window | null;
+    const createdPayload = await xumm.payload?.create(payload);
+    if (!createdPayload) throw new Error("Invalid Payload Parameter");
+    const uuid = createdPayload.uuid;
+    if (option?.onPayloadCreated) {
+      option.onPayloadCreated(createdPayload);
+    } else {
+      // open payload
+      pcWindowId = windowOpen(createdPayload.next.always);
+    }
+    // get payload status
+    const subscription = await xumm.payload?.subscribe(uuid);
+    if (!subscription) return;
+    subscription.websocket.onmessage = (message) => {
+      // subscription websocket message from xumm
+      if (message.data.toString().match(/signed/)) {
+        // close popup window(pc)
+        setTimeout(() => pcWindowId?.close(), 1500);
+        const json = JSON.parse(message.data.toString());
+        subscription.resolve(json.signed);
+      }
+    };
+    await subscription.resolved;
+
+    const result = await xumm.payload?.get(uuid);
+    return result;
+  };
 
   return {
-    ...xumm,
-    loading,
-    authorize: xumm.authorize,
-    logout,
-    ping: xumm.ping,
+    status,
+    connect,
+    disconnect,
+    signTransaction,
     user,
-    environment: {
-      ...environment,
-      retrieving: xumm.environment.retrieving,
-      ready: xumm.environment.ready,
-      success: xumm.environment.success,
-      retrieved: xumm.environment.retrieved,
-    },
+    environment,
+    xumm,
   };
 };

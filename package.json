@@ -1,6 +1,6 @@
 {
   "name": "@tequ/use-xumm-hook",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Use Xumm as custom React hooks.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
