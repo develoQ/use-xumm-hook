@@ -93,6 +93,10 @@ export const useXumm = (
       getUser();
       getEnvironment();
     };
+    xumm.on("ready", () => {
+      // Doesn't work in React's StrictMode (during development only).
+      setLoading(false);
+    });
     xumm.on("ready", fetch);
     xumm.on("success", fetch);
     xumm.on("retrieved", fetch);

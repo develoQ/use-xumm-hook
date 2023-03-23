@@ -7,6 +7,8 @@ It uses [Xumm-Universal-SDK](https://github.com/XRPL-Labs/Xumm-Universal-SDK) to
 
 ## installation
 
+You can use npm or yarn to install.
+
 npm
 ```sh
 npm install @tequ/use-xumm-hook
@@ -18,6 +20,10 @@ yarn add @tequ/use-xumm-hook
 ```
 
 ## usage
+
+Usage is simple. Just import the hook and pass your Xumm API key.
+
+You can get your Xumm API key from [here](https://apps.xumm.dev).
 
 ```tsx
 import useXumm from "@tequ/use-xumm-hook";
