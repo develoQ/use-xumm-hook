@@ -15,11 +15,14 @@ type RemovePromisified<T> = { [P in keyof T]: PromiseType<T[P]> };
 type User = RemovePromisified<Xumm["user"]>;
 type Environment = RemovePromisified<
   Omit<Xumm["environment"], "retrieving" | "ready" | "success" | "retrieved">
-  >;
-type SignTransactionCreatePayload =  XummPostPayloadBodyJson
-      | XummPostPayloadBodyBlob
-  | XummJsonTransaction
-type SignTransactionOption = { onPayloadCreated?: (payload: CreatedPayload) => void }
+>;
+type SignTransactionCreatePayload =
+  | XummPostPayloadBodyJson
+  | XummPostPayloadBodyBlob
+  | XummJsonTransaction;
+type SignTransactionOption = {
+  onPayloadCreated?: (payload: CreatedPayload) => void;
+};
 
 type ReturnType = {
   status: "loading" | "connected" | "unconnected";
@@ -48,11 +51,15 @@ export const useXumm = (
   const [environment, setEnvironment] = useState<Environment | undefined>(
     undefined
   );
+  // signIn status
   const status = useMemo(
     () => (loading ? "loading" : user ? "connected" : "unconnected"),
     [loading, user]
   );
 
+  /**
+   * Resolved user object
+   */
   const getUser = useCallback(async () => {
     const _user = Object.keys(xumm.user) as (keyof Xumm["user"])[];
     Promise.all(_user.map(async (u) => ({ [u]: await xumm.user[u] }))).then(
@@ -63,6 +70,9 @@ export const useXumm = (
     );
   }, [xumm.user]);
 
+  /**
+   * Resolved environment object
+   */
   const getEnvironment = useCallback(async () => {
     const _env = Object.keys(xumm.environment) as (keyof Xumm["environment"])[];
     Promise.all(
@@ -87,10 +97,16 @@ export const useXumm = (
     xumm.on("retrieved", fetch);
   }, [getEnvironment, getUser, xumm]);
 
+  /**
+   * Connect to Xumm
+   */
   const connect = useCallback(async () => {
     await xumm.authorize();
   }, [xumm]);
 
+  /**
+   * Disconnect from Xumm
+   */
   const disconnect = useCallback(async () => {
     if (xumm.runtime.xapp) {
       await xumm.xapp?.close();
@@ -101,6 +117,12 @@ export const useXumm = (
     }
   }, [xumm]);
 
+  /**
+   * Sign Transaction and wait for payload status change
+   * @param payload
+   * @param option
+   * @returns
+   */
   const signTransaction = async (
     payload: SignTransactionCreatePayload,
     option?: SignTransactionOption
@@ -110,16 +132,17 @@ export const useXumm = (
     if (!createdPayload) throw new Error("Invalid Payload Parameter");
     const uuid = createdPayload.uuid;
     if (option?.onPayloadCreated) {
+      // action on payload created if you want
       option.onPayloadCreated(createdPayload);
     } else {
-      // open payload
+      // open popup window(pc)
       pcWindowId = windowOpen(createdPayload.next.always);
     }
-    // get payload status
+    // get subscription websocket
     const subscription = await xumm.payload?.subscribe(uuid);
     if (!subscription) return;
     subscription.websocket.onmessage = (message) => {
-      // subscription websocket message from xumm
+      // resolve promise when receive signed message
       if (message.data.toString().match(/signed/)) {
         // close popup window(pc)
         setTimeout(() => pcWindowId?.close(), 1500);

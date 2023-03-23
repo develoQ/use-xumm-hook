@@ -11,6 +11,11 @@ const options = `
         resizable=no
       `;
 
+/**
+ * open url for pc and mobile device
+ * @param url 
+ * @returns 
+ */
 export const windowOpen = (url: string) => {
   if (navigator.userAgent.match(/(iPhone|iPad|iPod|Android)/i)) {
     // mobile
