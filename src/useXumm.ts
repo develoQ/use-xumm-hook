@@ -51,6 +51,7 @@ export const useXumm = (
   const [environment, setEnvironment] = useState<Environment | undefined>(
     undefined
   );
+
   // signIn status
   const status = useMemo(
     () => (loading ? "loading" : user ? "connected" : "unconnected"),
@@ -95,6 +96,9 @@ export const useXumm = (
     xumm.on("ready", fetch);
     xumm.on("success", fetch);
     xumm.on("retrieved", fetch);
+    return () => {
+      xumm.removeAllListeners();
+    };
   }, [getEnvironment, getUser, xumm]);
 
   /**
